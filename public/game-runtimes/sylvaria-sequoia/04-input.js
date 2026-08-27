@@ -7,16 +7,9 @@
   const SHIFT_KEYS = new Set(['ShiftLeft', 'ShiftRight']);
   const RESET_KEYS = new Set(['Digit0', 'Numpad0']);
   const START_JUMP_GUARD_MS = 80;
-  // WebKit can surface a late same-key edge after a completed keyboard.press()
-  // crosses iframe focus boundaries. Keep this per physical code so advanced
-  // players may still alternate jump keys rapidly without an artificial global
-  // Air Kick cooldown.
   const SAME_KEY_JUMP_REARM_MS = 82;
   const PHYSICAL_STALE_MS = 900;
 
-  // state.keys is allowed to clear on iframe blur for movement safety. physicalDown
-  // is deliberately separate and survives blur, preventing one held key from
-  // resurfacing as a second press when focus moves between host and runtime.
   const physicalDown = new Map();
   const lastReleasedAt = new Map();
   const suppressedJumpKeys = new Map();
@@ -26,9 +19,6 @@
   let lastSapPressAt = -Infinity;
   let pendingActivation = null;
 
-  // Runtime feel telemetry is deliberately tiny and allocation-free in the RAF
-  // path. It tells browser evidence whether a bad-feeling run came from physics,
-  // input gating, rendering cost, or repeated simulation catch-up.
   let frameCount = 0;
   let frameMsEwma = 16.67;
   let maxFrameMs = 0;
@@ -89,15 +79,25 @@
     return Boolean(S.releaseSapStick?.(reason));
   }
 
+  function cancelSapForFocusLoss(reason) {
+    if (S.cancelSapStick) return Boolean(S.cancelSapStick(reason));
+    return releaseSapStick(reason);
+  }
+
+  function clearTransientInput(reason) {
+    cancelSapForFocusLoss(reason);
+    state.keys.clear();
+    state.pointers.clear();
+    player.jumpHeld = false;
+    pendingActivation = null;
+  }
+
   function handleKeyDown(event) {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(event.code)) event.preventDefault();
     if (event.repeat) return;
     if (event.code === 'Escape') return;
     const now = performance.now();
 
-    // Sanitize a completed physical jump edge before admitting it into
-    // physicalDown. Doing this first is important: a rejected browser echo must
-    // never poison the held-key map and suppress the player's next real tap.
     const gameplayJump = state.mode === 'playing' && JUMP_KEYS.has(event.code);
     if (gameplayJump && isJumpQuarantined(event.code, now)) {
       rejectedJumpQuarantines += 1;
@@ -139,9 +139,6 @@
 
     if (state.mode === 'title' || state.mode === 'gameover' || state.mode === 'paused') {
       if (event.code === 'Space' || event.code === 'Enter') {
-        // Activation commits on keyup, after this physical press has ended. Starting
-        // on keydown used to move iframe focus mid-press and could surface a second
-        // Space edge as an unintended Air Kick in some browser engines.
         pendingActivation = { code: event.code, mode: state.mode };
         if (JUMP_KEYS.has(event.code)) state.keys.add(event.code);
       } else if (SHIFT_KEYS.has(event.code)) {
@@ -153,17 +150,12 @@
     if (SHIFT_KEYS.has(event.code)) {
       const alreadyHoldingShift = shiftHeld();
       state.keys.add(event.code);
-      // Shift owns the complete Sap Stick lifecycle: keydown fires immediately,
-      // holding keeps the tether alive while A/D shapes the swing, keyup vaults.
-      // Holding both Shift keys still counts as one physical Sap Stick press.
       if (!alreadyHoldingShift) triggerSapStickPress();
       return;
     }
 
     if (JUMP_KEYS.has(event.code)) {
       state.keys.add(event.code);
-      // Do not queue a hidden Air Kick while the player is deliberately shaping a
-      // Sap Stick swing. Release Shift first, then the next Space/W/Up is explicit.
       if (player.sap?.stickMode) {
         player.jumpHeld = false;
         return;
@@ -195,8 +187,6 @@
       } else if ((activation.mode === 'title' || activation.mode === 'gameover') && state.mode === activation.mode) {
         S.startRun(state.runSeed + 1);
       }
-      // A tiny post-release quarantine rejects a same-press browser echo without
-      // making the first intentional gameplay jump feel laggy.
       quarantineStartKey(event.code);
       state.keys.delete(event.code);
       player.jumpHeld = false;
@@ -245,14 +235,14 @@
   window.addEventListener('keydown', handleKeyDown, { passive: false });
   window.addEventListener('keyup', handleKeyUp);
   window.addEventListener('blur', () => {
-    // Release any live tether before focus state is cleared. Otherwise a missing
-    // Shift keyup during iframe focus churn could leave Pip attached indefinitely.
-    releaseSapStick('BLUR');
-    // Do not clear physicalDown here. Focus churn inside the Game Network iframe
-    // must not turn a held Space into another physical press.
-    state.keys.clear();
-    state.pointers.clear();
-    player.jumpHeld = false;
+    // A browser/iframe focus transition is not a player-authored Sap release.
+    // Cancel the live lease without release impulse, combo reward, or jump refresh.
+    // physicalDown deliberately survives so a held key cannot reappear as a new
+    // physical edge when focus returns.
+    clearTransientInput('BLUR');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearTransientInput('VISIBILITY_HIDDEN');
   });
 
   function frame(now) {
@@ -325,8 +315,6 @@
         rejectedJumpRepresses,
         rejectedJumpQuarantines,
         sapPressCount,
-        // Backward-compatible field name for existing telemetry consumers. It now
-        // counts one-button Shift presses rather than a Shift+Space chord.
         sapChordCount: sapPressCount,
         lastSapPressAgoMs: Number.isFinite(lastSapPressAt) ? Math.max(0, performance.now() - lastSapPressAt) : null,
       },
