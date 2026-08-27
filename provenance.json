@@ -1,6 +1,11 @@
 {
   "sourceRepository": "sidhulyalkar/sids-neural-net",
   "sourceCommit": "b6b5c89fffbd2429e628de800df40a52ec600ef8",
-  "gameVersion": "0.6.2",
-  "expectedRuntimeSha256": "73e89f393e94bf15f1b6393a00ef1a611b0d224b901ab7b5e5654a65511ddf0b"
+  "gameVersionAtExtraction": "0.6.2",
+  "sourceRuntimeSha256": "73e89f393e94bf15f1b6393a00ef1a611b0d224b901ab7b5e5654a65511ddf0b",
+  "sourceModuleCount": 38,
+  "sourceBytes": 387792,
+  "sourceBundleBytes": 389087,
+  "sourceBrotliBytes": 73454,
+  "note": "This fingerprint proves the initial extraction boundary. Current standalone builds may legitimately diverge after reviewed game changes."
 }

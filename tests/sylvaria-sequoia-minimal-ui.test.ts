@@ -39,7 +39,11 @@ test('Sylvaria traversal HUD stays panel-free while preserving intentional shop 
   assert.match(economy, /function shopCard/, 'the deliberate between-run shop remains available');
 
   assert.doesNotMatch(sap, /roundRect|fillRect|strokeRect/);
+  assert.match(sap, /const HUD_VERSION = 'shift-hold-minimal-v2'/);
+  assert.match(sap, /const HUD_REVISION = 'panel-free-transient-v3'/);
+  assert.match(sap, /revision: HUD_REVISION/);
   assert.match(sap, /panel-free, transient and contextual/);
+  assert.match(sap, /panelFree: true/);
 
   const recapDraw = between(recap, 'function drawRecap', 'function render(alpha');
   assert.doesNotMatch(recapDraw, /roundRect|strokeRect/);

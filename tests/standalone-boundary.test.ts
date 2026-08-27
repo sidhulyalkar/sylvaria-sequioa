@@ -11,7 +11,13 @@ test('standalone repository preserves the proven v0.6.2 extraction boundary', ()
 
   assert.equal(provenance.sourceRepository, 'sidhulyalkar/sids-neural-net');
   assert.equal(provenance.sourceCommit, 'b6b5c89fffbd2429e628de800df40a52ec600ef8');
-  assert.equal(provenance.expectedRuntimeSha256, '73e89f393e94bf15f1b6393a00ef1a611b0d224b901ab7b5e5654a65511ddf0b');
+  assert.equal(provenance.gameVersionAtExtraction, '0.6.2');
+  assert.equal(provenance.sourceRuntimeSha256, '73e89f393e94bf15f1b6393a00ef1a611b0d224b901ab7b5e5654a65511ddf0b');
+  assert.equal(provenance.sourceModuleCount, 38);
+  assert.equal(provenance.sourceBytes, 387792);
+  assert.equal(provenance.sourceBundleBytes, 389087);
+  assert.equal(provenance.sourceBrotliBytes, 73454);
+  assert.match(provenance.note, /initial extraction boundary/);
   assert.equal(manifest.version, '0.6.2');
   assert.equal(manifest.modules.length, 38);
   assert.equal(pkg.name, 'sylvaria-sequoia');

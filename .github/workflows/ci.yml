@@ -34,15 +34,26 @@ jobs:
       - name: Build deterministic runtime
         run: npm run build:runtime
 
-      - name: Verify pinned runtime fingerprint
+      - name: Verify extraction provenance and current build determinism
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
           const p = JSON.parse(fs.readFileSync('provenance.json', 'utf8'));
-          const m = JSON.parse(fs.readFileSync('public/game-runtimes/sylvaria-sequoia/runtime.bundle.meta.json', 'utf8'));
-          if (m.sha256 !== p.expectedRuntimeSha256) throw new Error(`runtime SHA drift: ${m.sha256}`);
-          if (m.moduleCount !== 38 || m.sourceBytes !== 387792 || m.brotliBytes !== 73454) throw new Error(`runtime fingerprint drift: ${JSON.stringify(m)}`);
-          console.log(m);
+          if (p.sourceRepository !== 'sidhulyalkar/sids-neural-net') throw new Error('source repository provenance drift');
+          if (p.sourceCommit !== 'b6b5c89fffbd2429e628de800df40a52ec600ef8') throw new Error('source commit provenance drift');
+          if (p.sourceRuntimeSha256 !== '73e89f393e94bf15f1b6393a00ef1a611b0d224b901ab7b5e5654a65511ddf0b') throw new Error('source runtime provenance drift');
+          if (p.sourceModuleCount !== 38 || p.sourceBytes !== 387792 || p.sourceBundleBytes !== 389087 || p.sourceBrotliBytes !== 73454) throw new Error('source size provenance drift');
+          const path = 'public/game-runtimes/sylvaria-sequoia/runtime.bundle.meta.json';
+          const first = JSON.parse(fs.readFileSync(path, 'utf8'));
+          execFileSync(process.execPath, ['scripts/build-sylvaria-runtime.mjs'], { stdio: 'inherit' });
+          const second = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (first.sha256 !== second.sha256 || first.sourceBytes !== second.sourceBytes || first.bundleBytes !== second.bundleBytes || first.brotliBytes !== second.brotliBytes) {
+            throw new Error(`non-deterministic runtime build: ${JSON.stringify({ first, second })}`);
+          }
+          if (second.moduleCount !== 38) throw new Error(`module count drift: ${second.moduleCount}`);
+          if (second.sourceBytes > second.sourceBudgetBytes || second.brotliBytes > second.brotliBudgetBytes) throw new Error(`runtime budget exceeded: ${JSON.stringify(second)}`);
+          console.log({ extractionBaseline: p, currentRuntime: second });
           NODE
 
       - name: Start standalone cabinet

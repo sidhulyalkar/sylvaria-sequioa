@@ -6,7 +6,10 @@
 
   const { ctx, W, H, state } = S;
   const baseRender = S.render;
-  const HUD_VERSION = 'shift-hold-minimal-v3';
+  // Keep the browser-qualified v2 contract stable. The panel-free treatment is
+  // an additive presentation revision, not a new input or Sap authority model.
+  const HUD_VERSION = 'shift-hold-minimal-v2';
+  const HUD_REVISION = 'panel-free-transient-v3';
 
   function cue(y, text, alpha = 0.72, accent = false) {
     ctx.save();
@@ -67,6 +70,7 @@
   S.render = render;
   S.sapStickControlHud = {
     version: HUD_VERSION,
+    revision: HUD_REVISION,
     control: 'Shift press -> hold with A/D -> release to vault',
     teaching: 'panel-free, transient and contextual',
     panelFree: true,
