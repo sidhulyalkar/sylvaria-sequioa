@@ -4,7 +4,7 @@
   const S = window.SylvariaSequoia;
   if (!S?.render || !S?.canopyEconomy || !S?.sapRhythm) return;
 
-  const { ctx, W, H, state, player, clamp, round } = S;
+  const { ctx, W, H, state, player, clamp } = S;
   const baseRender = S.render;
   const VERSION = 'canopy-contracts-hud-v2';
   // Qualification continuity: canopy-contracts-hud-v1 evolved into this panel-free traversal surface.
@@ -51,18 +51,19 @@
   }
 
   function missionSignature(missions) {
-    return missions.map((mission) => `${mission.id}:${mission.progress}:${mission.target}:${mission.done ? 1 : 0}`).join('|');
+    return missions.map((mission) => `${mission.id}:${Number(mission.ratio || 0).toFixed(3)}:${mission.done ? 1 : 0}`).join('|');
   }
 
   function missionChanged(previous, missions) {
     if (!previous) return missions.find((mission) => !mission.done) || null;
     const before = new Map(previous.split('|').map((part) => {
-      const [id, progress, target, done] = part.split(':');
-      return [id, { progress: Number(progress), target: Number(target), done: done === '1' }];
+      const [id, ratio, done] = part.split(':');
+      return [id, { ratio: Number(ratio), done: done === '1' }];
     }));
     return missions.find((mission) => {
       const old = before.get(mission.id);
-      return old && (mission.progress !== old.progress || mission.done !== old.done);
+      const ratio = Number(mission.ratio || 0);
+      return old && (Math.abs(ratio - old.ratio) >= 0.001 || mission.done !== old.done);
     }) || null;
   }
 
@@ -101,9 +102,10 @@
 
     const fade = clamp((pulseUntil - nowSeconds) / 0.34, 0, 1);
     const right = state.RIGHT_WALL - 12;
+    const status = mission.detail || mission.description || `${Math.round((mission.ratio || 0) * 100)}%`;
     const label = pulseReason === 'COMPLETE'
       ? `CONTRACT COMPLETE · ${mission.name}`
-      : `${mission.name} · ${mission.progress}/${mission.target} · TOKENS ${economy.wallet}`;
+      : `${mission.name} · ${status} · TOKENS ${economy.wallet}`;
 
     ctx.save();
     ctx.globalAlpha = fade;
