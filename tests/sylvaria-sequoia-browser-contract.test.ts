@@ -124,3 +124,20 @@ test('nearest Sap authority qualification isolates spent spam and authored ident
     'tether-energy authority must not depend on browser RAF cadence',
   );
 });
+
+test('focus loss cancels Sap without manufacturing traversal authority', () => {
+  const authority = readRuntime('02-sap-authority-v2.js');
+  const input = readRuntime('04-input.js');
+  assert.match(authority, /function cancelSapStick\(reason = 'FOCUS_LOSS'\)/);
+  assert.match(authority, /focusLossIsNeutral: true/);
+  assert.match(authority, /sapAuthorityFocusCancellations/);
+  assert.match(authority, /score: snapshot\.score/);
+  assert.match(authority, /comboTimer: snapshot\.comboTimer/);
+  assert.match(input, /clearTransientInput\('BLUR'\)/);
+  assert.match(input, /clearTransientInput\('VISIBILITY_HIDDEN'\)/);
+  assert.doesNotMatch(
+    input,
+    /window\.addEventListener\('blur',[\s\S]{0,220}releaseSapStick\('BLUR'\)/,
+    'blur must go through neutral cancellation instead of a normal vault release',
+  );
+});
