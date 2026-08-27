@@ -8,11 +8,15 @@ const runtimeRoot = join(root, 'public/game-runtimes/sylvaria-sequoia');
 const readRuntime = (name: string) => readFileSync(join(runtimeRoot, name), 'utf8');
 const readScript = (name: string) => readFileSync(join(root, 'scripts', name), 'utf8');
 
-test('Cone Token HUD uses the canonical camera projection without hidden renderer globals', () => {
+test('Cone Token HUD uses canonical camera and mission-state contracts', () => {
   const hud = readRuntime('03-canopy-economy-hud.js');
   assert.match(hud, /function worldToScreenY\(worldY\)/);
   assert.match(hud, /return H - \(worldY - state\.cameraBottom\);/);
   assert.match(hud, /y: worldToScreenY\(token\.y\)/);
+  assert.match(hud, /mission\.detail \|\| mission\.description/);
+  assert.match(hud, /Number\(mission\.ratio \|\| 0\)\.toFixed\(3\)/);
+  assert.doesNotMatch(hud, /mission\.progress/, 'HUD must not read the removed mission.progress field');
+  assert.doesNotMatch(hud, /mission\.target/, 'HUD must not read the removed mission.target field');
   assert.doesNotMatch(hud, /S\.sy\(/, 'economy HUD must not depend on a renderer-private helper');
 });
 
