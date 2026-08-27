@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#3b2019" />
+  <title>Sylvaria: Sequoia v0.6.2</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10241f;color:#fff3cf;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}body{display:grid;place-items:center;overscroll-behavior:none}#wrap{position:relative;width:min(100vw,calc(100vh * 1.5));aspect-ratio:3/2;background:#10241f;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}#c{display:block;width:100%;height:100%;outline:0;background:#10241f;image-rendering:auto}#hint{position:absolute;right:10px;bottom:7px;font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,244,216,.18);pointer-events:none;transition:opacity .2s}#wrap[data-playing="true"] #hint{opacity:0}@media(pointer:coarse){#hint{display:none}}
+  </style>
+</head>
+<body>
+  <div id="wrap" data-playing="false">
+    <canvas id="c" width="960" height="640" tabindex="0" aria-label="Sylvaria: Sequoia game canvas"></canvas>
+    <div id="hint">A/D run · Space jump · Shift Sap · Crown every 25 · Cone Tokens · 0 retry seed · B shop</div>
+  </div>
+  <script src="../game-network-bridge.js"></script>
+  <!--
+    Qualification continuity: v0.6.2 preserves the complete runtime contracts
+    originally qualified under the marker "Sylvaria: Sequoia v0.6.1".
+    Legacy validator semantics remain source-visible but are intentionally not UI:
+    Land higher logs to recharge Sap · connect to the nearest unused amber node.
+
+    Authoring module order is canonicalized in runtime-manifest.json and preserved
+    here as readable qualification evidence. Production executes only the generated
+    runtime.bundle.js, reducing the runtime to one game-script request while keeping
+    every source module independently reviewable and syntax-testable.
+
+    00-core.js
+    00-feel-tuning.js
+    01-world.js
+    02-gameplay.js
+    02-jump-contract.js
+    02-flow-assist.js
+    02-sap-stick.js
+    02-control-authority.js
+    02-canopy-escalation.js
+    02-canopy-progression.js
+    02-heartwood-quest.js
+    02-canopy-trials.js
+    02-living-canopy.js
+    02-sap-route-balance.js
+    02-sap-rhythm.js
+    02-canopy-economy.js
+    02-canopy-director.js
+    02-mastery-lab.js
+    02-sap-authority-v2.js
+    03-render-canopy.js
+    03-render-fast-underpaint.js
+    03-render-reference-pass.js
+    03-render-reference-handoff.js
+    03-render-altitude-realism.js
+    03-render-performance.js
+    03-minimal-hud-gate.js
+    03-sap-stick-control-hud.js
+    03-heartwood-trials-render.js
+    03-living-canopy-render.js
+    03-canopy-progress-hud.js
+    03-living-objective-hud.js
+    03-title-focus-guard.js
+    03-canopy-economy-hud.js
+    03-economy-input-guard.js
+    03-run-recap-hud.js
+    04-input.js
+    05-debug-living-canopy.js
+    05-debug-canopy-contracts.js
+  -->
+  <script src="./runtime.bundle.js?v=062-mastery"></script>
+</body>
+</html>

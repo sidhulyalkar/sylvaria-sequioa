@@ -1,0 +1,27 @@
+{
+  "name": "sylvaria-sequoia",
+  "version": "0.6.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:runtime": "node scripts/build-sylvaria-runtime.mjs",
+    "build": "npm run build:runtime",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "check:flow": "node scripts/validate-sylvaria-flow-envelope.mjs",
+    "check:heartwood": "node scripts/validate-sylvaria-heartwood.mjs",
+    "check:living-canopy": "node scripts/validate-sylvaria-living-canopy.mjs",
+    "check:economy": "node scripts/validate-sylvaria-economy.mjs",
+    "check:sap-authority": "node scripts/validate-sylvaria-sap-authority.mjs",
+    "check:runtime": "node scripts/validate-sylvaria-runtime-bundle.mjs",
+    "check:mastery": "node scripts/validate-sylvaria-mastery.mjs",
+    "check": "npm test && npm run check:runtime && npm run check:flow && npm run check:heartwood && npm run check:living-canopy && npm run check:economy && npm run check:sap-authority && npm run check:mastery",
+    "dev": "npm run build:runtime && node scripts/serve.mjs",
+    "start": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

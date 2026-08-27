@@ -1,0 +1,147 @@
+name: Sylvaria Sequoia standalone CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sylvaria-standalone-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  game-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install exact standalone dependencies
+        run: npm ci
+
+      - name: Run source contracts and static validators
+        run: npm run check
+
+      - name: Build deterministic runtime
+        run: npm run build:runtime
+
+      - name: Verify extraction provenance and current build determinism
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const p = JSON.parse(fs.readFileSync('provenance.json', 'utf8'));
+          if (p.sourceRepository !== 'sidhulyalkar/sids-neural-net') throw new Error('source repository provenance drift');
+          if (p.sourceCommit !== 'b6b5c89fffbd2429e628de800df40a52ec600ef8') throw new Error('source commit provenance drift');
+          if (p.sourceRuntimeSha256 !== '73e89f393e94bf15f1b6393a00ef1a611b0d224b901ab7b5e5654a65511ddf0b') throw new Error('source runtime provenance drift');
+          if (p.sourceModuleCount !== 38 || p.sourceBytes !== 387792 || p.sourceBundleBytes !== 389087 || p.sourceBrotliBytes !== 73454) throw new Error('source size provenance drift');
+          const path = 'public/game-runtimes/sylvaria-sequoia/runtime.bundle.meta.json';
+          const first = JSON.parse(fs.readFileSync(path, 'utf8'));
+          execFileSync(process.execPath, ['scripts/build-sylvaria-runtime.mjs'], { stdio: 'inherit' });
+          const second = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (first.sha256 !== second.sha256 || first.sourceBytes !== second.sourceBytes || first.bundleBytes !== second.bundleBytes || first.brotliBytes !== second.brotliBytes) {
+            throw new Error(`non-deterministic runtime build: ${JSON.stringify({ first, second })}`);
+          }
+          if (second.moduleCount !== 38) throw new Error(`module count drift: ${second.moduleCount}`);
+          if (second.sourceBytes > second.sourceBudgetBytes || second.brotliBytes > second.brotliBudgetBytes) throw new Error(`runtime budget exceeded: ${JSON.stringify(second)}`);
+          console.log({ extractionBaseline: p, currentRuntime: second });
+          NODE
+
+      - name: Start standalone cabinet
+        run: |
+          node scripts/serve.mjs > /tmp/sylvaria-standalone.log 2>&1 &
+          echo $! > /tmp/sylvaria-standalone.pid
+          for attempt in {1..40}; do
+            if curl -fsS http://127.0.0.1:3000/arcade/sylvaria-sequoia >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/sylvaria-standalone.log
+          exit 1
+
+      - name: Smoke standalone routes and generated runtime
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:3000/ -o /tmp/root.html
+          grep -q 'Sylvaria: Sequoia' /tmp/root.html
+          curl -fsS http://127.0.0.1:3000/arcade/sylvaria-sequoia -o /tmp/cabinet.html
+          grep -q 'game-runtimes/sylvaria-sequoia/index.html' /tmp/cabinet.html
+          curl -fsS http://127.0.0.1:3000/game-runtimes/sylvaria-sequoia/index.html -o /tmp/runtime.html
+          grep -q 'Sylvaria: Sequoia v0.6.2' /tmp/runtime.html
+          curl -fsS 'http://127.0.0.1:3000/game-runtimes/sylvaria-sequoia/runtime.bundle.js?v=062-mastery' -o /tmp/runtime.js
+          grep -q 'mastery-lab-v1' /tmp/runtime.js
+
+      - name: Cache Playwright browser payload
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: sylvaria-standalone-${{ runner.os }}-playwright-1.55.0-${{ hashFiles('package-lock.json') }}
+
+      - name: Install four browser engines
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/sylvaria-playwright
+          npm install --prefix /tmp/sylvaria-playwright --no-package-lock --no-save playwright@1.55.0
+          PW=/tmp/sylvaria-playwright/node_modules/.bin/playwright
+          "$PW" install-deps chromium firefox webkit
+          "$PW" install chromium firefox webkit
+          if ! command -v google-chrome >/dev/null 2>&1 && ! command -v google-chrome-stable >/dev/null 2>&1; then "$PW" install chrome; fi
+
+      - name: Validate movement and one-button Sap across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_SHIFT_BROWSER_DIR: artifacts/sylvaria-sequoia-shift-hold
+        run: node scripts/playtest-sylvaria-shift-hold.mjs
+
+      - name: Validate Heartwood and canopy trials across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_HEARTWOOD_BROWSER_DIR: artifacts/sylvaria-sequoia-heartwood
+        run: node scripts/playtest-sylvaria-heartwood.mjs
+
+      - name: Validate Living Canopy Wonders and Skyheart across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_LIVING_BROWSER_DIR: artifacts/sylvaria-sequoia-living-canopy
+        run: node scripts/playtest-sylvaria-living-canopy-v2.mjs
+
+      - name: Validate Canopy Contracts economy across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_ECONOMY_BROWSER_DIR: artifacts/sylvaria-sequoia-canopy-contracts
+        run: node scripts/playtest-sylvaria-economy.mjs
+
+      - name: Validate Sap authority and Shift-spam resistance across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_SAP_AUTHORITY_BROWSER_DIR: artifacts/sylvaria-sequoia-sap-authority
+        run: node scripts/playtest-sylvaria-sap-authority.mjs
+
+      - name: Validate focus-safe Sap cancellation across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_FOCUS_BROWSER_DIR: artifacts/sylvaria-sequoia-focus-safety
+        run: node scripts/playtest-sylvaria-focus-safety.mjs
+
+      - name: Validate Mastery Lab and deterministic difficulty across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_MASTERY_BROWSER_DIR: artifacts/sylvaria-sequoia-mastery
+        run: node scripts/playtest-sylvaria-mastery.mjs
+
+      - name: Upload four-engine evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sylvaria-sequoia-standalone-browser-evidence
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
