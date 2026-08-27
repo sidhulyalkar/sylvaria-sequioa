@@ -1,0 +1,5 @@
+node_modules/
+artifacts/
+.DS_Store
+public/game-runtimes/sylvaria-sequoia/runtime.bundle.js
+public/game-runtimes/sylvaria-sequoia/runtime.bundle.meta.json
