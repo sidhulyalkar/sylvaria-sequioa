@@ -72,7 +72,7 @@
     version: HUD_VERSION,
     revision: HUD_REVISION,
     control: 'Shift press -> hold with A/D -> release to vault',
-    teaching: 'panel-free, transient and contextual',
+    teaching: 'panel-free, transient and contextual; no persistent side panels',
     panelFree: true,
     resetKey: '0',
   };
