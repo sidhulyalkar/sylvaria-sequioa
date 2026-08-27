@@ -92,8 +92,18 @@ function assertInitial(initial) {
   if (!initial.living || initial.living.count !== 0 || initial.living.total !== 6 || initial.living.skyheartFloor !== 360) {
     throw new Error(`Living Canopy initial state invalid: ${JSON.stringify(initial.living)}`);
   }
-  if (initial.render?.version !== 'living-canopy-render-v1' || initial.hud?.version !== 'living-objective-hud-v1') {
-    throw new Error(`Living Canopy render/HUD unavailable: ${JSON.stringify({ render: initial.render, hud: initial.hud })}`);
+  const renderReady = initial.render?.version === 'living-canopy-render-v1'
+    && initial.render?.worldSpaceDiscovery === true
+    && initial.render?.skyheartDestination === 360;
+  const hudReady = initial.hud?.version === 'living-objective-hud-v2'
+    && initial.hud?.revision === 'panel-free-traversal-focus-v2'
+    && initial.hud?.visibleDuring === 'playing-only'
+    && initial.hud?.panelFree === true
+    && Array.isArray(initial.hud?.objectiveLadder)
+    && initial.hud.objectiveLadder.includes('Skyheart')
+    && initial.hud.objectiveLadder.includes('Endless Elder Canopy');
+  if (!renderReady || !hudReady) {
+    throw new Error(`Living Canopy render/HUD capability contract unavailable: ${JSON.stringify({ render: initial.render, hud: initial.hud })}`);
   }
   for (const grammar of ['CHOIRLINE', 'HOLLOWRUN', 'MIGRATION', 'AURORARUN', 'ELDERSPAN', 'ECHOFLIGHT', 'SKYHEART']) {
     if (!initial.grammars.includes(grammar)) throw new Error(`missing Living Canopy grammar ${grammar}`);
