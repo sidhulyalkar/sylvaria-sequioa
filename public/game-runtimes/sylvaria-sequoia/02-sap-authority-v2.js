@@ -59,6 +59,7 @@
   let leaseEntrySpeed = 0;
   let leaseSpeedCap = 0;
   let energyClamps = 0;
+  let focusCancellations = 0;
   const usedAnchorIds = new Set();
 
   function bumpCounter(name) {
@@ -66,10 +67,6 @@
     counters[name] = (counters[name] || 0) + 1;
   }
 
-  // Identity is authored topology, never presentation/physics state. Moving
-  // Pendulum/Skyheart anchors can change x/y every frame without becoming a new
-  // authority node. These four fields are assigned when the route step is born
-  // and remain stable for that knot's lifetime.
   function anchorId(knot) {
     return [
       String(knot?.chunkId || 'route'),
@@ -233,6 +230,60 @@
     return released;
   }
 
+  // Browser focus transitions are not player-authored release input. We still run
+  // the base release path so its held-key bookkeeping is cleared, but restore every
+  // movement/scoring field that path may touch. The Sap lease remains spent, which
+  // prevents focus churn from becoming a free re-arm exploit.
+  function cancelSapStick(reason = 'FOCUS_LOSS') {
+    if (!player.sap?.stickMode) return false;
+    const snapshot = {
+      vx: player.vx,
+      vy: player.vy,
+      airJumps: player.airJumps,
+      state: player.state,
+      stretch: player.stretch,
+      strideMomentum: player.strideMomentum,
+      combo: player.combo,
+      comboTimer: player.comboTimer,
+      comboLastLinkAt: player.comboLastLinkAt,
+      comboLastLinkType: player.comboLastLinkType,
+      comboKindsMask: player.comboKindsMask,
+      score: player.score,
+      shake: state.shake,
+    };
+    const released = Boolean(baseRelease('BLUR'));
+    Object.assign(player, {
+      vx: snapshot.vx,
+      vy: snapshot.vy,
+      airJumps: snapshot.airJumps,
+      state: snapshot.state === 'sap-stick' ? (snapshot.vy >= 0 ? 'airborne-down' : 'airborne-up') : snapshot.state,
+      stretch: snapshot.stretch,
+      strideMomentum: snapshot.strideMomentum,
+      combo: snapshot.combo,
+      comboTimer: snapshot.comboTimer,
+      comboLastLinkAt: snapshot.comboLastLinkAt,
+      comboLastLinkType: snapshot.comboLastLinkType,
+      comboKindsMask: snapshot.comboKindsMask,
+      score: snapshot.score,
+    });
+    state.shake = snapshot.shake;
+    player.sap = null;
+    releaseBaseline = null;
+    activeLeaseId = '';
+    activeLeaseKnot = null;
+    focusCancellations += 1;
+    bumpCounter('sapAuthorityFocusCancellations');
+    recordEvent('sap-authority-focus-cancelled', {
+      reason,
+      spentAtFloor,
+      highestPhysicalFloor,
+      focusCancellations,
+      vx: S.round(player.vx, 1),
+      vy: S.round(player.vy, 1),
+    });
+    return released;
+  }
+
   function observeGrounding() {
     const branch = player.grounded;
     if (!branch) {
@@ -240,10 +291,6 @@
       return;
     }
 
-    // A collision graze is not a physical landing. Do not advance either the
-    // eligibility floor or the recharge floor until the branch has actually held
-    // Pip for the minimum grounded interval. Keeping lastGroundedBranch unset here
-    // lets the same branch become authoritative once the hold matures.
     if (player.groundedTime < MIN_GROUNDED_REARM_SECONDS) return;
     if (branch === lastGroundedBranch) return;
     lastGroundedBranch = branch;
@@ -281,8 +328,6 @@
         rejectUnexpectedAttach('LEASE_NODE_MISMATCH', velocityBeforeUpdate);
         leaseRejected = true;
       } else {
-        // Steering can rotate/shape the swing, but repeated fixed updates cannot
-        // pump the tether above the bounded energy budget granted on acquisition.
         capSpeed(leaseSpeedCap);
       }
     }
@@ -310,6 +355,7 @@
     leaseEntrySpeed = 0;
     leaseSpeedCap = 0;
     energyClamps = 0;
+    focusCancellations = 0;
     usedAnchorIds.clear();
   }
 
@@ -340,6 +386,7 @@
       nodeUses,
       recharges,
       energyClamps,
+      focusCancellations,
       leaseEntrySpeed: S.round(leaseEntrySpeed, 1),
       leaseSpeedCap: S.round(leaseSpeedCap, 1),
       nearestTarget: nearest ? {
@@ -351,6 +398,7 @@
       } : null,
       pressTimeAcquisition: true,
       immutableAnchorIdentity: true,
+      focusLossIsNeutral: true,
       anchorIdentityFields: ['chunkId', 'floor', 'role', 'anchorKind'],
       bufferedAcquisitionSeconds: TUNE.sap.stickAcquireBufferSeconds,
       minimumGroundedRearmSeconds: MIN_GROUNDED_REARM_SECONDS,
@@ -367,10 +415,12 @@
   S.pressSapStick = pressSapStick;
   S.castSapStick = pressSapStick;
   S.releaseSapStick = releaseSapStick;
-  S.sapAuthority = { version: VERSION, getState, getTargetPreview: nearestEligibleAnchor };
+  S.cancelSapStick = cancelSapStick;
+  S.sapAuthority = { version: VERSION, getState, getTargetPreview: nearestEligibleAnchor, cancel: cancelSapStick };
   S.sapStick.cast = pressSapStick;
   S.sapStick.press = pressSapStick;
   S.sapStick.release = releaseSapStick;
+  S.sapStick.cancel = cancelSapStick;
   S.sapStick.getTargetPreview = nearestEligibleAnchor;
   S.sapStick.getState = () => ({
     ...baseSapState(),
