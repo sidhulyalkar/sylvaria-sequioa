@@ -1,0 +1,135 @@
+name: Bootstrap pinned Sylvaria source
+
+on:
+  push:
+    branches: [feat/standalone-v062]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sylvaria-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  import-and-prove:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      UPSTREAM_SHA: b6b5c89fffbd2429e628de800df40a52ec600ef8
+      EXPECTED_RUNTIME_SHA: 73e89f393e94bf15f1b6393a00ef1a611b0d224b901ab7b5e5654a65511ddf0b
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Fetch the pinned authored game source
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/sylvaria-upstream
+          git init /tmp/sylvaria-upstream
+          git -C /tmp/sylvaria-upstream remote add origin https://github.com/sidhulyalkar/sids-neural-net.git
+          git -C /tmp/sylvaria-upstream fetch --depth=1 origin "$UPSTREAM_SHA"
+          git -C /tmp/sylvaria-upstream checkout --detach FETCH_HEAD
+          test "$(git -C /tmp/sylvaria-upstream rev-parse HEAD)" = "$UPSTREAM_SHA"
+
+      - name: Import only Sylvaria-owned files
+        run: |
+          set -euo pipefail
+          U=/tmp/sylvaria-upstream
+          mkdir -p public/game-runtimes scripts tests docs
+          rm -rf public/game-runtimes/sylvaria-sequoia
+          cp -R "$U/public/game-runtimes/sylvaria-sequoia" public/game-runtimes/
+          cp "$U/public/game-runtimes/game-network-bridge.js" public/game-runtimes/
+
+          for file in \
+            build-sylvaria-runtime.mjs \
+            validate-sylvaria-flow-envelope.mjs \
+            validate-sylvaria-heartwood.mjs \
+            validate-sylvaria-living-canopy.mjs \
+            validate-sylvaria-economy.mjs \
+            validate-sylvaria-sap-authority.mjs \
+            validate-sylvaria-runtime-bundle.mjs \
+            validate-sylvaria-mastery.mjs \
+            playtest-sylvaria-shift-hold.mjs \
+            playtest-sylvaria-heartwood.mjs \
+            playtest-sylvaria-living-canopy.mjs \
+            playtest-sylvaria-living-canopy-v2.mjs \
+            playtest-sylvaria-economy.mjs \
+            playtest-sylvaria-sap-authority.mjs \
+            playtest-sylvaria-mastery.mjs; do
+            cp "$U/scripts/$file" "scripts/$file"
+          done
+
+          for file in \
+            sylvaria-sequoia-browser-contract.test.ts \
+            sylvaria-sequoia-director.test.ts \
+            sylvaria-sequoia-minimal-ui.test.ts; do
+            cp "$U/tests/$file" "tests/$file"
+          done
+
+          for file in \
+            SYLVARIA_SEQUOIA_V05_LIVING_CANOPY.md \
+            SYLVARIA_SEQUOIA_V06_CANOPY_CONTRACTS.md \
+            SYLVARIA_SEQUOIA_V061_PACING_DIRECTOR.md \
+            SYLVARIA_SEQUOIA_V062_MASTERY_LAB.md; do
+            cp "$U/docs/$file" "docs/$file"
+          done
+
+          cat > provenance.json <<JSON
+          {
+            "sourceRepository": "sidhulyalkar/sids-neural-net",
+            "sourceCommit": "$UPSTREAM_SHA",
+            "gameVersion": "0.6.2",
+            "expectedRuntimeSha256": "$EXPECTED_RUNTIME_SHA"
+          }
+          JSON
+
+      - name: Generate minimal standalone lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Install standalone dependencies
+        run: npm ci
+
+      - name: Prove imported source contracts
+        run: |
+          set -euo pipefail
+          npm test
+          npm run check:runtime
+          npm run check:flow
+          npm run check:heartwood
+          npm run check:living-canopy
+          npm run check:economy
+          npm run check:sap-authority
+          npm run check:mastery
+
+      - name: Prove extraction reproduces the pinned runtime
+        run: |
+          set -euo pipefail
+          npm run build:runtime
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p = JSON.parse(fs.readFileSync('provenance.json', 'utf8'));
+          const m = JSON.parse(fs.readFileSync('public/game-runtimes/sylvaria-sequoia/runtime.bundle.meta.json', 'utf8'));
+          if (m.sha256 !== p.expectedRuntimeSha256) throw new Error(`runtime SHA drift: ${m.sha256} != ${p.expectedRuntimeSha256}`);
+          if (m.moduleCount !== 38) throw new Error(`module count drift: ${m.moduleCount}`);
+          if (m.sourceBytes !== 387792) throw new Error(`source byte drift: ${m.sourceBytes}`);
+          if (m.brotliBytes !== 73454) throw new Error(`Brotli byte drift: ${m.brotliBytes}`);
+          console.log('Pinned Sylvaria extraction reproduced exactly', m);
+          NODE
+
+      - name: Commit the proven standalone source and retire bootstrap
+        run: |
+          set -euo pipefail
+          rm .github/workflows/bootstrap.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Import proven Sylvaria Sequoia v0.6.2 source"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sylvaria: Sequoia</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07110d}body{display:grid}iframe{width:100%;height:100%;border:0;background:#07110d}body:after{content:'click game to focus · Esc releases focus';position:fixed;right:12px;bottom:9px;color:#c9d7ce99;font:11px system-ui;pointer-events:none;transition:opacity .2s}.game-runtime-focused body:after{opacity:0}
+</style>
+</head>
+<body><iframe id="game" title="Sylvaria: Sequoia" src="/game-runtimes/sylvaria-sequoia/index.html" allow="autoplay; fullscreen"></iframe><script>
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.source!=='sids-game-network-runtime')return;document.documentElement.classList.toggle('game-runtime-focused',e.data.kind!=='escape')});
+</script></body>
+</html>
