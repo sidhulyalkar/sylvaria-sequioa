@@ -56,6 +56,15 @@ test('Living Canopy browser qualification preserves authored progression across 
   assert.match(harness, /await page\.reload\(\{ waitUntil: 'networkidle' \}\)/);
   assert.match(harness, /'sylvaria\.sequoia\.wonderMask': '63'/);
   assert.match(harness, /'sylvaria\.sequoia\.heartseedMask': '31'/);
+  assert.match(harness, /initial\.hud\?\.version === 'living-objective-hud-v2'/);
+  assert.match(harness, /initial\.hud\?\.revision === 'panel-free-traversal-focus-v2'/);
+  assert.match(harness, /initial\.hud\?\.visibleDuring === 'playing-only'/);
+  assert.match(harness, /initial\.hud\?\.panelFree === true/);
+  assert.doesNotMatch(
+    harness,
+    /initial\.hud\?\.version !== 'living-objective-hud-v1'/,
+    'Living Canopy qualification must not pin the retired HUD v1 surface',
+  );
   assert.doesNotMatch(
     harness,
     /page\.addInitScript\([\s\S]*sylvaria\.sequoia\.wonderMask/,
