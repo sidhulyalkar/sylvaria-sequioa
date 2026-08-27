@@ -125,6 +125,12 @@ jobs:
           SYLVARIA_SAP_AUTHORITY_BROWSER_DIR: artifacts/sylvaria-sequoia-sap-authority
         run: node scripts/playtest-sylvaria-sap-authority.mjs
 
+      - name: Validate focus-safe Sap cancellation across four engines
+        env:
+          PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
+          SYLVARIA_FOCUS_BROWSER_DIR: artifacts/sylvaria-sequoia-focus-safety
+        run: node scripts/playtest-sylvaria-focus-safety.mjs
+
       - name: Validate Mastery Lab and deterministic difficulty across four engines
         env:
           PLAYWRIGHT_MODULE_ROOT: /tmp/sylvaria-playwright/node_modules/playwright
